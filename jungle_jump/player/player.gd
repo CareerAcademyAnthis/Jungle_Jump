@@ -1,11 +1,15 @@
 extends CharacterBody2D
 
+signal life_changed
+signal died
+
 @export var gravity = 750
 @export var run_speed = 750
 @export var jump_speed = -300
 
 enum {IDLE, RUN, JUMP, HURT, DEAD}
 var state = IDLE
+var life = 3: set = set_life
 
 func _ready() -> void:
 	change_state(IDLE)
@@ -15,7 +19,13 @@ func reset(_position):
 	show()
 	change_state(IDLE)
 	
+func hurt():
+	if state != HURT:
+		change_state(HURT)
+	
 func get_input():
+	if state == HURT:
+		return
 	var right = Input.is_action_pressed("right")
 	var left = Input.is_action_pressed("left")
 	var jump = Input.is_action_just_pressed("jump")
@@ -51,9 +61,15 @@ func change_state(new_state):
 			$AnimationPlayer.play("run")
 		HURT:
 			$AnimationPlayer.play("hurt")
+			velocity.y = -200
+			velocity.x = -100 * sign(velocity.x)
+			life -= 1
+			await get_tree().create_timer(0.5).timeout
+			change_state(IDLE)
 		JUMP:
 			$AnimationPlayer.play("jump_up")
 		DEAD:
+			died.emit()
 			hide()
 
 func _physics_process(delta: float) -> void:
@@ -64,7 +80,9 @@ func _physics_process(delta: float) -> void:
 	
 	if state == JUMP and is_on_floor():
 		change_state(IDLE)
-	
 	if state == JUMP and velocity.y > 0:
 		$AnimationPlayer.play("jump_down")
-	
+
+func set_life(value):
+	life = value
+	life_changed.emit(life)
